@@ -1,10 +1,10 @@
 # Railway Nixpacks konfiguratsiyasi (Docker'siz).
-# Next.js avtomatik aniqlanadi; biz faqat tizim FFmpeg + fontconfig qo'shamiz.
+# Node versiyasi .nvmrc (20) va package.json "engines" orqali aniqlanadi.
+# Bu yerda faqat tizim FFmpeg + fontconfig qo'shamiz.
 
 [phases.setup]
 aptPkgs = ["ffmpeg", "fontconfig"]
 
 [variables]
-# Tizim FFmpeg'idan foydalanamiz (libass + fontsdir to'liq ishlaydi)
 FFMPEG_PATH = "/usr/bin/ffmpeg"
 NODE_ENV = "production"
