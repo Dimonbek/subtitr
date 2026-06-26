@@ -1,8 +1,20 @@
 import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
+import { existsSync } from "node:fs";
 import ffmpegStatic from "ffmpeg-static";
 
-export const FFMPEG_PATH: string = process.env.FFMPEG_PATH ?? ffmpegStatic ?? "ffmpeg";
+// FFmpeg yo'lini mustahkam aniqlash. MUHIM: bo'sh satr (`""`) ham "sozlanmagan"
+// hisoblanadi — aks holda spawn("") "argument 'file' cannot be empty" xatosini beradi.
+function resolveFfmpegPath(): string {
+  const env = process.env.FFMPEG_PATH?.trim();
+  // env "ffmpeg" (PATH orqali) yoki mavjud fayl bo'lsa — ishlatamiz
+  if (env && (env === "ffmpeg" || existsSync(env))) return env;
+  if (ffmpegStatic && existsSync(ffmpegStatic)) return ffmpegStatic; // bundled binary
+  if (ffmpegStatic) return ffmpegStatic;
+  return "ffmpeg"; // tizim PATH (apt o'rnatgan /usr/bin/ffmpeg)
+}
+
+export const FFMPEG_PATH: string = resolveFfmpegPath();
 
 export interface VideoMetadata {
   width: number;
