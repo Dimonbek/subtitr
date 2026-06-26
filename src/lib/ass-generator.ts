@@ -12,30 +12,54 @@ interface Line {
 }
 
 const MAX_LINE_DURATION_SEC = 3.5;
+// Segment ichida ham shu vaqtdan katta pauza bo'lsa — qatorni bo'lamiz
+// (gapirib to'xtagan joyda yangi qator boshlanadi).
+const PAUSE_BREAK_SEC = 0.5;
 
 export function chunkWordsIntoLines(transcript: Transcript, maxWordsPerLine: number): Line[] {
-  const allWords = transcript.segments.flatMap((s) => s.words);
   const lines: Line[] = [];
-  let current: WordToken[] = [];
-  let chunkStart = 0;
 
-  const flush = () => {
-    if (current.length === 0) return;
-    lines.push({
-      start: current[0].start,
-      end: current[current.length - 1].end,
-      words: current,
-    });
-    current = [];
-  };
+  // MUHIM: har bir segment (gap/jumla) ICHIDA bo'lamiz. Bir qator hech qachon
+  // ikki segmentga (ikki gapga) yoyilmaydi — shuning uchun keyingi gapning
+  // so'zi oldingi gap qatoriga aralashmaydi.
+  for (const segment of transcript.segments) {
+    let current: WordToken[] = [];
+    let chunkStart = 0;
 
-  for (const word of allWords) {
-    if (current.length === 0) chunkStart = word.start;
-    current.push(word);
-    const elapsed = word.end - chunkStart;
-    if (current.length >= maxWordsPerLine || elapsed >= MAX_LINE_DURATION_SEC) flush();
+    const flush = () => {
+      if (current.length === 0) return;
+      lines.push({
+        start: current[0].start,
+        end: current[current.length - 1].end,
+        words: current,
+      });
+      current = [];
+    };
+
+    for (let i = 0; i < segment.words.length; i++) {
+      const word = segment.words[i];
+      if (current.length === 0) chunkStart = word.start;
+      current.push(word);
+
+      const elapsed = word.end - chunkStart;
+      const next = segment.words[i + 1];
+      const gapToNext = next ? next.start - word.end : 0;
+      // So'z gap tinish belgisi bilan tugasa (. ! ? …) — qatorni shu yerda
+      // yopamiz, keyingi gap so'zi bu qatorga aralashmasin.
+      const endsSentence = /[.!?…]$/.test(word.word.trim());
+
+      if (
+        current.length >= maxWordsPerLine ||
+        elapsed >= MAX_LINE_DURATION_SEC ||
+        endsSentence ||
+        (next && gapToNext >= PAUSE_BREAK_SEC)
+      ) {
+        flush();
+      }
+    }
+    flush(); // segment tugadi — keyingi segmentga o'tmaymiz
   }
-  flush();
+
   return lines;
 }
 
