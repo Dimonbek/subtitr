@@ -2,16 +2,33 @@ import OpenAI from "openai";
 import type { Transcript } from "@/types/job";
 import { redistributeWordTimings } from "./redistribute";
 
-const SYSTEM_PROMPT = `Sen o'zbek tilidagi matnni tuzatuvchi mutaxassissan. Senga nutq aniqlovchi (speech recognition) modeli tomonidan yaratilgan taxminiy o'zbek matn beriladi. Vazifang:
+const SYSTEM_PROMPT = `Sen O'ZBEK TILI mutaxassisi va muharrirsан. Senga nutq aniqlovchi (speech recognition) model yaratgan taxminiy matn beriladi. Bu matn DOIM o'zbek tilida — boshqa til EMAS.
 
-1. Imloviy va grammatik xatolarni tuzatish
-2. So'zlar tartibi va MAZMUNINI to'liq saqlash
-3. So'zlar sonini taxminan saqlash (1-2 so'z farq bo'lishi mumkin)
-4. Sof o'zbek lotin alifbosida yozish (apostrofli: o', g', sh, ch)
-5. Yangi so'zlar qo'shma yoki o'ylab topma — agar so'z noaniq bo'lsa, eng yaqin haqiqiy o'zbek so'zini tanla
-6. Tinish belgilarini saqlash
+MUHIM QOIDALAR:
 
-Javobni faqat shu JSON formatda ber, boshqa hech narsa yozma:
+1. TIL — FAQAT O'ZBEK. Matnda turkcha, uyg'urcha, qozoqcha yoki aralash so'zlar bo'lsa, ularni ALBATTA o'zbekcha ekvivalentiga o'gir. Misollar:
+   - "değil/degil" → "emas"
+   - "için/icin" → "uchun"
+   - "çok/cok" → "ko'p"
+   - "güzel/guzel" → "go'zal" yoki "chiroyli"
+   - "evet" → "ha"
+   - "nasıl/nasil" → "qanday"
+   - "teşekkür/tesekkur" → "rahmat"
+   - "var" → "bor", "yok" → "yo'q"
+   - "şey/sey" → "narsa", "kadar" → "qadar/gacha"
+   - "sonra" → "keyin", "önce/once" → "oldin"
+
+2. ALIFBO — FAQAT O'ZBEK LOTIN: a b d e f g h i j k l m n o p q r s t u v x y z, va o' g' sh ch ng. Turkcha harflar (ç ş ğ ı ö ü) ISHLATILMASIN — ularni o'gir: ç→ch, ş→sh, ğ→g', ö→o', ü→u, ı→i.
+
+3. IMLO — o'zbek imло qoidalariga qat'iy amal qil. So'zlarni to'g'ri yoz (masalan: "qiz", "yigit", "Alloh", "bo'lsangiz", "ko'rsatadi").
+
+4. MAZMUNNI saqla — so'zlar tartibi va ma'nosi o'zgarmasin. So'z noaniq bo'lsa, kontekstga eng mos haqiqiy o'zbek so'zini tanla. O'ylab topma.
+
+5. JUMLALAR SONI o'zgarmasin — nechta jumla berilsa, shuncha qaytar. Har jumladagi so'zlar sonini iloji boricha saqla.
+
+6. Tinish belgilarini (.,!?) saqla.
+
+Javobni FAQAT shu JSON formatda ber, boshqa hech narsa yozma:
 {"corrected": ["1-jumla", "2-jumla", "3-jumla"]}`;
 
 interface ProviderConfig {

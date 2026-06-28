@@ -115,10 +115,44 @@ export function normalizeApostrophes(text: string): string {
 }
 
 /**
- * Matnni lotin + standart apostrofga keltiradi: kirill bo'lsa transliteratsiya,
- * keyin apostroflarni normallashtirish.
+ * Turkcha-ga xos harflarni o'zbek lotin alifbosidagi ekvivalentiga o'giradi.
+ * Bu harflar (ç ş ğ ı ö ü â î û) o'zbek lotin alifbosida UMUMAN ishlatilmaydi,
+ * shuning uchun ElevenLabs ularni qaytarsa — bu turkcha "sizib chiqishi" demak.
+ * Deterministik o'girish: ç→ch, ş→sh, ğ→g', ı→i, ö→o', ü→u.
+ */
+const TURKISH_MAP: Record<string, string> = {
+  ç: "ch",
+  ş: "sh",
+  ğ: "g'",
+  ı: "i",
+  ö: "o'",
+  ü: "u",
+  â: "a",
+  î: "i",
+  û: "u",
+  Ç: "Ch",
+  Ş: "Sh",
+  Ğ: "G'",
+  İ: "I",
+  Ö: "O'",
+  Ü: "U",
+  Â: "A",
+  Î: "I",
+  Û: "U",
+};
+
+export function turkishToUzbek(text: string): string {
+  return text.replace(/[çşğıöüâîûÇŞĞİÖÜÂÎÛ]/g, (ch) => TURKISH_MAP[ch] ?? ch);
+}
+
+/**
+ * Matnni o'zbek lotin alifbosiga keltiradi:
+ *   1) kirill bo'lsa → lotin transliteratsiya
+ *   2) turkcha harflar → o'zbekcha (ç→ch, ş→sh, ...)
+ *   3) apostroflarni standartlash (´ ` ' → ')
  */
 export function ensureLatin(text: string): string {
-  const latin = isCyrillic(text) ? cyrillicToLatin(text) : text;
-  return normalizeApostrophes(latin);
+  let out = isCyrillic(text) ? cyrillicToLatin(text) : text;
+  out = turkishToUzbek(out);
+  return normalizeApostrophes(out);
 }
