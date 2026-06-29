@@ -46,12 +46,13 @@ async function runTranscription(jobId: string): Promise<void> {
   const raw = await defaultTranscriber.transcribe(paths.audioWav(jobId), "uz");
 
   let transcript = raw;
-  // Aniq ASR (ElevenLabs) uchun yengil post-processing — to'g'ri so'zlarni buzmaslik uchun:
-  //   • lug'at: faqat aniq fix'lar (fuzzy match yo'q)
-  //   • LLM: o'chiq (chunki yaxshi matnni buzadi/hallucination)
-  // Zaif ASR (Whisper) uchun to'liq: fuzzy lug'at + LLM.
-  const useFuzzy = !isHighAccuracy && process.env.UZBEK_DICT !== "off";
+  // Post-processing:
+  //   • lug'at fuzzy: ENDI har doim yoqiq — 93k so'zli lug'at + qo'shimcha-ajratuvchi
+  //     validator tufayli to'g'ri so'zlar buzilmaydi, faqat g'aliz so'zlar tuzatiladi.
+  //   • LLM: ElevenLabs'da default o'chiq (deterministik lug'at yetarli, hallucination yo'q);
+  //     Whisper'da yoqiq (zaif ASR uchun kontekst kerak).
   const useDict = process.env.UZBEK_DICT !== "off";
+  const useFuzzy = useDict; // katta lug'at + validator -> xavfsiz
   const useLlm = isHighAccuracy
     ? process.env.UZBEK_CORRECTION === "on" // ElevenLabs'da default o'chiq, faqat majburlasa
     : process.env.UZBEK_CORRECTION !== "off"; // Whisper'da default yoqiq

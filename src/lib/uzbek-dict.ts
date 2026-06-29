@@ -84,6 +84,65 @@ export function isInDict(word: string, dict: Dict): boolean {
   return dict.words.has(normalize(stripPunct(word)));
 }
 
+// O'zbek tili — agglyutinativ: so'zga qo'shimchalar ketma-ket ulanadi.
+// Lug'at asosan O'ZAKlardan iborat (qiz, bo'l, ko'rsat...), qo'shimchali
+// shakllar (qiz-i-ni, bo'l-sa-ngiz) unda yo'q. Shuning uchun qo'shimchalarni
+// bosqichma-bosqich ajratib, o'zak lug'atda bormi tekshiramiz.
+const UZBEK_SUFFIXES: string[] = [
+  // egalik + kelishik birikmalari (uzunroq — oldin)
+  "laringizni", "laringiz", "larimizni", "larimiz", "larini", "lariga", "larida",
+  "laridan", "larning", "ingizni", "imizni", "ngizni", "siningiz",
+  // fe'l zamonlari
+  "yapsizmi", "yapsiz", "yapman", "yapti", "moqchi", "moqda", "masdan", "guncha",
+  "maganmiz", "maydi", "magan", "yotgan", "ayotgan", "ganimiz", "adilar", "yotir",
+  // fe'l shaxs-son qo'shimchalari
+  "amiz", "asiz", "aman", "asan", "adi", "ymiz", "ysiz", "yman", "ysan", "ydi",
+  // yasovchi qo'shimchalar (ot/sifat/fe'l yasaydi)
+  "lashtir", "lantir", "lash", "lan", "uvchilik", "uvchi", "ishi", "ish", "uv",
+  "chilik", "garchilik", "doshlik", "lik", "chi", "dosh", "gar", "kor", "iston",
+  // ko'plik + egalik
+  "larim", "laring", "larni", "larga", "larda", "lardan", "larcha", "lar",
+  // kelishik
+  "ningki", "ning", "niki", "dagi", "gacha", "nikidan",
+  // egalik
+  "imiz", "ingiz", "lari", "miz", "ngiz", "im", "ing", "si",
+  // kelishik (qisqa)
+  "ni", "ga", "ka", "qa", "da", "dan", "na", "cha", "dek", "day",
+  // fe'l qo'shimchalari
+  "gan", "kan", "qan", "gani", "sin", "sak", "sang", "sa", "dim", "ding",
+  "dik", "dingiz", "dilar", "ibmiz", "ib", "mas", "may", "di", "ti",
+  // sifat/ravish + qisqa
+  "siz", "li", "roq", "gina", "sh", "i", "a",
+];
+const SORTED_SUFFIXES = [...UZBEK_SUFFIXES].sort((a, b) => b.length - a.length);
+
+/**
+ * So'z haqiqiy o'zbekcha (yoki uning qonuniy qo'shimchali shakli) ekanini
+ * tekshiradi. Qo'shimchalarni bosqichma-bosqich ajratib, o'zak lug'atda
+ * borligini qaraydi. Bu to'g'ri so'zlarni "tuzatib" buzib qo'yishning oldini oladi.
+ */
+export function isValidUzbek(word: string, dict: Dict): boolean {
+  let w = normalize(word);
+  if (!w) return false;
+  if (dict.words.has(w)) return true;
+
+  for (let iter = 0; iter < 4 && w.length >= 3; iter++) {
+    let stripped = false;
+    for (const suf of SORTED_SUFFIXES) {
+      if (w.length - suf.length >= 2 && w.endsWith(suf)) {
+        w = w.slice(0, w.length - suf.length);
+        if (dict.words.has(w)) return true;
+        // qo'shimcha ajratgandan keyin tushgan undosh/unli (egalik) — yumshoq tekshiruv
+        if (dict.words.has(w + "i") || dict.words.has(w + "a")) return true;
+        stripped = true;
+        break;
+      }
+    }
+    if (!stripped) break;
+  }
+  return dict.words.has(w);
+}
+
 function stripPunct(word: string): string {
   // So'z atrofidagi tinish belgilarini olib tashlash, lekin o'rtadagi apostrofni saqlash
   return word.replace(/^[\s.,!?;:"'()«»“”]+|[\s.,!?;:"'()«»“”]+$/g, "");
@@ -187,13 +246,22 @@ function correctToken(token: string, dict: Dict, opts: DictOptions): string {
   const fix = dict.fixes.get(normalized);
   if (fix) return leading + matchCase(core, fix) + trailing;
 
-  // 2. Lug'atda mavjud — o'zgartirmaymiz
-  if (dict.words.has(normalized)) return token;
+  // 2. Haqiqiy o'zbekcha so'z (yoki qonuniy qo'shimchali shakl) — TEGMAYMIZ.
+  //    Katta lug'at + qo'shimcha-ajratuvchi tufayli ko'pchilik to'g'ri so'zlar
+  //    shu yerda saqlanadi, fuzzy ularni buzmaydi.
+  if (isValidUzbek(normalized, dict)) return token;
 
-  // 3. Eng yaqin so'z — faqat fuzzy yoqilgan bo'lsa (zaif ASR uchun)
+  // 3. Lug'atda yo'q (g'aliz) so'z — KONSERVATIV fuzzy bilan eng yaqin
+  //    haqiqiy o'zbek so'ziga moslaymiz. Qisqa so'zlarda 1 ta, uzunda 2 ta
+  //    harf farqi; birinchi 2 harf mos kelishi shart.
   if (opts.fuzzy) {
-    const closest = findClosest(normalized, dict, 2);
-    if (closest && closest !== normalized) {
+    const maxDist = normalized.length <= 6 ? 1 : 2;
+    const closest = findClosest(normalized, dict, maxDist);
+    if (
+      closest &&
+      closest !== normalized &&
+      closest.slice(0, 2) === normalized.slice(0, 2)
+    ) {
       return leading + matchCase(core, closest) + trailing;
     }
   }
