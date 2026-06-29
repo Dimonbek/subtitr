@@ -61,7 +61,7 @@ export function TranscriptEditor({ jobId, transcript, disabled, onSaved }: Trans
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs text-muted-foreground">
-            Whisper aniqlamagan so'zlarni qo'lda tahrirlang. Saqlagandan keyin <b>Render</b> tugmasini bosing.
+            Whisper aniqlamagan so'zlarni qo'lda tahrirlang. Saqlagandan keyin <b>Tayyorlash</b> tugmasini bosing.
             Vaqt har segment ichida so'zlar bo'yicha avtomatik qayta taqsimlanadi.
           </p>
         </div>

@@ -26,8 +26,16 @@ export interface Transcript {
   segments: TranscriptSegment[];
 }
 
+/** So'z-so'z effekt turi:
+ *  - highlight: faol so'z rangi o'zgaradi (bepul)
+ *  - pop: faol so'z kattalashib qaytadi (premium)
+ *  - weight: aytilgan so'z qalindan ingichkaga o'tadi (premium)
+ *  - bounce: faol so'z yuqoriga sakraydi (premium)
+ */
+export type CaptionAnimation = "highlight" | "pop" | "weight" | "bounce";
+
 export interface StylePreset {
-  id: "tiktok" | "mrbeast" | "minimal" | "neon";
+  id: string;
   name: string;
   description: string;
   fontFamily: string;
@@ -37,6 +45,8 @@ export interface StylePreset {
   outlineColor: string;
   outlineWidth: number;
   bold: boolean;
+  animation: CaptionAnimation;
+  premium: boolean;
 }
 
 export interface Job {
@@ -49,7 +59,8 @@ export interface Job {
   sourceSize: number;
   duration?: number;
   transcript?: Transcript;
-  preset?: StylePreset["id"];
+  preset?: string;
+  font?: string;
   createdAt: number;
   updatedAt: number;
 }

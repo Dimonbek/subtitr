@@ -1,14 +1,20 @@
 import { promises as fs } from "node:fs";
 import { paths } from "./paths";
 import { STYLE_PRESETS } from "./style-presets";
+import { fontFamilyFromId } from "./fonts";
 import { buildAssFile } from "./ass-generator";
 import { burnSubtitles, probeVideo } from "./ffmpeg";
 import { getJob, setStatus, updateJob, failJob, loadJobFromDisk } from "./jobs";
-import type { StylePreset, Transcript } from "@/types/job";
+import type { Transcript } from "@/types/job";
 
-export async function renderJob(jobId: string, presetId: StylePreset["id"]): Promise<void> {
+export async function renderJob(
+  jobId: string,
+  presetId: string,
+  fontId?: string,
+): Promise<void> {
   const preset = STYLE_PRESETS[presetId];
   if (!preset) throw new Error(`Noma'lum style preset: ${presetId}`);
+  const fontOverride = fontFamilyFromId(fontId) ?? undefined;
 
   const job = getJob(jobId) ?? (await loadJobFromDisk(jobId));
   if (!job) throw new Error("Job topilmadi");
@@ -27,17 +33,22 @@ export async function renderJob(jobId: string, presetId: StylePreset["id"]): Pro
     throw new Error("Transkripsiya topilmadi — avval video transcribe qilinishi kerak");
   }
 
-  updateJob(jobId, { preset: presetId });
+  updateJob(jobId, { preset: presetId, font: fontId });
 
   try {
     setStatus(jobId, "rendering", 0, "Video o'lchami aniqlanmoqda...");
     const meta = probeVideo(paths.sourceVideo(jobId));
 
     setStatus(jobId, "rendering", 2, "Subtitr fayl yaratilmoqda...");
-    const ass = buildAssFile(transcript, preset, { width: meta.width, height: meta.height });
+    const ass = buildAssFile(
+      transcript,
+      preset,
+      { width: meta.width, height: meta.height },
+      fontOverride,
+    );
     await fs.writeFile(paths.subtitleAss(jobId), ass, "utf8");
 
-    setStatus(jobId, "rendering", 5, "Video render qilinmoqda...");
+    setStatus(jobId, "rendering", 5, "Video tayyorlanmoqda...");
     await burnSubtitles(
       paths.sourceVideo(jobId),
       paths.subtitleAss(jobId),

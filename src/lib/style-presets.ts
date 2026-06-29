@@ -1,13 +1,13 @@
 import type { StylePreset } from "@/types/job";
 
-// Shrift nomlari loyiha ichidagi fonts/ papkasidagi fayllarning ichki
-// (family) nomlariga mos kelishi shart — chunki render vaqtida libass shu
-// papkadan (fontsdir) yuklaydi. Mavjud: Anton, Archivo Black, Montserrat.
-export const STYLE_PRESETS: Record<StylePreset["id"], StylePreset> = {
+// Shrift nomlari loyiha ichidagi fonts/ papkasidagi fayllarning ichki (family)
+// nomlariga mos kelishi shart — render vaqtida libass shu papkadan yuklaydi.
+export const STYLE_PRESETS: Record<string, StylePreset> = {
+  // ===== BEPUL =====
   tiktok: {
     id: "tiktok",
     name: "TikTok",
-    description: "Oq matn, sariq active so'z, qora outline — klassik TikTok ko'rinishi",
+    description: "Oq matn, sariq active so'z — klassik TikTok ko'rinishi",
     fontFamily: "Archivo Black",
     fontSize: 72,
     primaryColor: "#FFFFFF",
@@ -15,6 +15,8 @@ export const STYLE_PRESETS: Record<StylePreset["id"], StylePreset> = {
     outlineColor: "#000000",
     outlineWidth: 5,
     bold: false,
+    animation: "highlight",
+    premium: false,
   },
   mrbeast: {
     id: "mrbeast",
@@ -27,11 +29,13 @@ export const STYLE_PRESETS: Record<StylePreset["id"], StylePreset> = {
     outlineColor: "#000000",
     outlineWidth: 7,
     bold: false,
+    animation: "highlight",
+    premium: false,
   },
   minimal: {
     id: "minimal",
     name: "Minimal",
-    description: "Sodda oq matn, ozgina outline — neytral va keng moslashuvchan",
+    description: "Sodda oq matn — neytral va keng moslashuvchan",
     fontFamily: "Montserrat",
     fontSize: 58,
     primaryColor: "#FFFFFF",
@@ -39,6 +43,8 @@ export const STYLE_PRESETS: Record<StylePreset["id"], StylePreset> = {
     outlineColor: "#000000",
     outlineWidth: 3,
     bold: false,
+    animation: "highlight",
+    premium: false,
   },
   neon: {
     id: "neon",
@@ -51,7 +57,61 @@ export const STYLE_PRESETS: Record<StylePreset["id"], StylePreset> = {
     outlineColor: "#1A0033",
     outlineWidth: 4,
     bold: false,
+    animation: "highlight",
+    premium: false,
+  },
+
+  // ===== PREMIUM =====
+  fokus: {
+    id: "fokus",
+    name: "Fokus",
+    description: "Aytilgan so'z qalindan ingichkaga o'tadi — diqqat faol so'zda",
+    fontFamily: "Poppins",
+    fontSize: 64,
+    primaryColor: "#FFFFFF",
+    highlightColor: "#FFD400",
+    outlineColor: "#000000",
+    outlineWidth: 4,
+    bold: true,
+    animation: "weight",
+    premium: true,
+  },
+  zarba: {
+    id: "zarba",
+    name: "Zarba",
+    description: "Faol so'z kattalashib zarba beradi — energiyali",
+    fontFamily: "Archivo Black",
+    fontSize: 70,
+    primaryColor: "#FFFFFF",
+    highlightColor: "#FF3B30",
+    outlineColor: "#000000",
+    outlineWidth: 5,
+    bold: false,
+    animation: "pop",
+    premium: true,
+  },
+  sakrash: {
+    id: "sakrash",
+    name: "Sakrash",
+    description: "Faol so'z yuqoriga sakraydi — jonli va o'ynoqi",
+    fontFamily: "Anton",
+    fontSize: 80,
+    primaryColor: "#FFFFFF",
+    highlightColor: "#00E5FF",
+    outlineColor: "#000000",
+    outlineWidth: 6,
+    bold: false,
+    animation: "bounce",
+    premium: true,
   },
 };
 
-export const PRESET_ORDER: StylePreset["id"][] = ["tiktok", "mrbeast", "minimal", "neon"];
+export const PRESET_ORDER: string[] = [
+  "tiktok",
+  "mrbeast",
+  "minimal",
+  "neon",
+  "fokus",
+  "zarba",
+  "sakrash",
+];

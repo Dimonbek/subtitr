@@ -1,22 +1,26 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { Crown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PRESET_ORDER, STYLE_PRESETS } from "@/lib/style-presets";
 import type { StylePreset } from "@/types/job";
 
 interface StylePresetPickerProps {
-  selected: StylePreset["id"] | null;
-  onSelect: (id: StylePreset["id"]) => void;
+  selected: string | null;
+  onSelect: (id: string) => void;
   disabled?: boolean;
+  /** Premium uslublardan foydalanish mumkinmi (obuna). */
+  isPro?: boolean;
 }
 
-export function StylePresetPicker({ selected, onSelect, disabled }: StylePresetPickerProps) {
+export function StylePresetPicker({ selected, onSelect, disabled, isPro }: StylePresetPickerProps) {
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       {PRESET_ORDER.map((id) => {
         const preset = STYLE_PRESETS[id];
         const isSelected = selected === id;
+        const locked = preset.premium && !isPro;
         return (
           <button
             key={id}
@@ -32,13 +36,23 @@ export function StylePresetPicker({ selected, onSelect, disabled }: StylePresetP
             )}
           >
             <PresetPreview presetId={id} />
-            <h4 className="mt-3 text-sm font-semibold">{preset.name}</h4>
+            <div className="mt-3 flex items-center gap-1.5">
+              <h4 className="text-sm font-semibold">{preset.name}</h4>
+              {preset.premium && (
+                <Crown className="h-3.5 w-3.5 text-amber-500" aria-label="Premium" />
+              )}
+            </div>
             <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
               {preset.description}
             </p>
             {isSelected && (
-              <span className="absolute top-2 right-2 rounded-full bg-brand px-2 py-0.5 text-[10px] font-medium text-brand-foreground">
-                Tanlangan
+              <span className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-[10px] font-medium text-brand-foreground">
+                <Check className="h-2.5 w-2.5" /> Tanlangan
+              </span>
+            )}
+            {locked && !isSelected && (
+              <span className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-medium text-white">
+                <Crown className="h-2.5 w-2.5" /> Pro
               </span>
             )}
           </button>

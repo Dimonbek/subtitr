@@ -67,6 +67,7 @@ export function buildAssFile(
   transcript: Transcript,
   preset: StylePreset,
   video: VideoDimensions,
+  fontOverride?: string,
 ): string {
   // Portret bo'lsa 3 ta, landscape bo'lsa 5 ta so'z qatorda
   const isPortrait = video.height > video.width;
@@ -80,11 +81,12 @@ export function buildAssFile(
   const outlineWidth = Math.max(1, Math.round(preset.outlineWidth * (fontSize / preset.fontSize)));
   const marginH = Math.round(video.width * 0.06);
   const marginV = Math.round(video.height * 0.12);
+  const fontFamily = fontOverride || preset.fontFamily;
 
   const lines = chunkWordsIntoLines(transcript, maxWords);
-  const styleSection = buildStyleSection(preset, fontSize, outlineWidth, marginH, marginV);
+  const styleSection = buildStyleSection(preset, fontFamily, fontSize, outlineWidth, marginH, marginV);
   const events = lines
-    .map((line, idx) => {
+    .flatMap((line, idx) => {
       const next = lines[idx + 1];
       const trailing = 0.25;
       // Keyingi qatordan oldin 50ms gap qoldiramiz — overlap'siz va frame-perfect
@@ -92,7 +94,7 @@ export function buildAssFile(
       const cappedEnd = next
         ? Math.min(line.end + trailing, Math.max(line.end, next.start - gap))
         : line.end + trailing;
-      return buildDialogueLine(line, preset, cappedEnd);
+      return buildLineEvents(line, preset, cappedEnd);
     })
     .filter(Boolean)
     .join("\n");
@@ -120,6 +122,7 @@ export function buildAssFile(
 
 function buildStyleSection(
   preset: StylePreset,
+  fontFamily: string,
   fontSize: number,
   outlineWidth: number,
   marginH: number,
@@ -133,17 +136,64 @@ function buildStyleSection(
   const shadow = preset.id === "neon" ? 2 : 0;
   const alignment = 2; // bottom-center
 
-  return `Style: Subtitr,${preset.fontFamily},${fontSize},${primary},${secondary},${outline},${back},${bold},0,0,0,100,100,0,0,1,${outlineWidth},${shadow},${alignment},${marginH},${marginH},${marginV},1`;
+  return `Style: Subtitr,${fontFamily},${fontSize},${primary},${secondary},${outline},${back},${bold},0,0,0,100,100,0,0,1,${outlineWidth},${shadow},${alignment},${marginH},${marginH},${marginV},1`;
 }
 
-function buildDialogueLine(line: Line, preset: StylePreset, endTime: number): string {
+/** Bitta qatordan bir yoki bir nechta Dialogue eventlari yaratadi (animatsiyaga qarab). */
+function buildLineEvents(line: Line, preset: StylePreset, endTime: number): string[] {
   const start = formatAssTime(line.start);
-  // endTime — keyingi qator boshlanishi yoki line.end + 0.25 dan kichigi.
-  // start + 50ms minimal davomiylik (degenerativ holatlar uchun).
   const end = formatAssTime(Math.max(endTime, line.start + 0.05));
+
+  if (preset.animation === "weight") {
+    return buildWeightEvents(line, preset, endTime);
+  }
+
   const text = buildKaraokeText(line, preset);
-  if (!text) return "";
-  return `Dialogue: 0,${start},${end},Subtitr,,0,0,0,,${text}`;
+  if (!text) return [];
+  return [`Dialogue: 0,${start},${end},Subtitr,,0,0,0,,${text}`];
+}
+
+/**
+ * PREMIUM "weight" effekti: aytilgan so'z QALINdan INGICHKAga o'tadi.
+ * ASS'da \b (qalin) ni \t bilan animatsiya qilib bo'lmaydi, shuning uchun har
+ * "joriy so'z" oralig'i uchun alohida Dialogue event chiqaramiz: o'tgan so'zlar
+ * ingichka (\b0) va xira, joriy + keyingi so'zlar qalin (\b1).
+ */
+function buildWeightEvents(line: Line, preset: StylePreset, endTime: number): string[] {
+  const primary = inlineColor(preset.primaryColor);
+  const highlight = inlineColor(preset.highlightColor);
+  const words = line.words.filter((w) => sanitizeWord(w.word));
+  if (words.length === 0) return [];
+
+  const events: string[] = [];
+  for (let k = 0; k < words.length; k++) {
+    const segStart = words[k].start;
+    const segEnd = k < words.length - 1 ? words[k + 1].start : endTime;
+    if (segEnd <= segStart + 0.02) continue;
+
+    const fadeIn = k === 0 ? 100 : 0;
+    const fadeOut = k === words.length - 1 ? 60 : 0;
+    const parts: string[] = [`{\\fad(${fadeIn},${fadeOut})}`];
+
+    for (let i = 0; i < words.length; i++) {
+      const cleaned = sanitizeWord(words[i].word);
+      if (i < k) {
+        // aytilgan so'z: ingichka (regular) + xira
+        parts.push(`{\\b0\\1c${primary}\\alpha&H66&}${cleaned}`);
+      } else if (i === k) {
+        // joriy so'z: qalin + highlight rang
+        parts.push(`{\\b1\\1c${highlight}\\alpha&H00&}${cleaned}`);
+      } else {
+        // hali aytilmagan: qalin + primary
+        parts.push(`{\\b1\\1c${primary}\\alpha&H00&}${cleaned}`);
+      }
+      if (i < words.length - 1) parts.push(`{\\b1\\alpha&H00&} `);
+    }
+    events.push(
+      `Dialogue: 0,${formatAssTime(segStart)},${formatAssTime(segEnd)},Subtitr,,0,0,0,,${parts.join("")}`,
+    );
+  }
+  return events;
 }
 
 function buildKaraokeText(line: Line, preset: StylePreset): string {
@@ -166,13 +216,34 @@ function buildKaraokeText(line: Line, preset: StylePreset): string {
     const endMs = Math.max(startMs + 40, Math.round((w.end - line.start) * 1000));
     const cleaned = sanitizeWord(w.word);
     if (!cleaned) continue;
-    // static \1c primary (cascade reset) + faqat shu so'z oynasida highlight
-    parts.push(
-      `{\\1c${primary}\\t(${startMs},${startMs + COLOR_FADE_MS},\\1c${highlight})\\t(${endMs},${endMs + COLOR_FADE_MS},\\1c${primary})}`,
-    );
+
+    // Har so'z bloki static reset bilan boshlanadi (cascade'ni bekor qiladi),
+    // keyin animatsiya turiga qarab effekt qo'shiladi.
+    let anim = `\\1c${primary}`;
+    // rang highlight — barcha turlarda bor
+    anim += `\\t(${startMs},${startMs + COLOR_FADE_MS},\\1c${highlight})\\t(${endMs},${endMs + COLOR_FADE_MS},\\1c${primary})`;
+
+    if (preset.animation === "pop") {
+      // PREMIUM: faol so'z kattalashib qaytadi (zarba)
+      anim =
+        `\\1c${primary}\\fscx100\\fscy100` +
+        `\\t(${startMs},${startMs + COLOR_FADE_MS},\\1c${highlight}\\fscx122\\fscy122)` +
+        `\\t(${startMs + COLOR_FADE_MS},${startMs + 200},\\fscx100\\fscy100)` +
+        `\\t(${endMs},${endMs + COLOR_FADE_MS},\\1c${primary})`;
+    } else if (preset.animation === "bounce") {
+      // PREMIUM: faol so'z sakraydi (scale overshoot)
+      anim =
+        `\\1c${primary}\\fscx100\\fscy100` +
+        `\\t(${startMs},${startMs + 60},\\1c${highlight}\\fscx112\\fscy132)` +
+        `\\t(${startMs + 60},${startMs + 150},\\fscx104\\fscy92)` +
+        `\\t(${startMs + 150},${startMs + 240},\\fscx100\\fscy100)` +
+        `\\t(${endMs},${endMs + COLOR_FADE_MS},\\1c${primary})`;
+    }
+
+    parts.push(`{${anim}}`);
     parts.push(cleaned);
-    // Bo'sh joy ham primary (cascade'siz)
-    if (i < line.words.length - 1) parts.push(`{\\1c${primary}} `);
+    // Bo'sh joy — primary, normal o'lcham (cascade'siz)
+    if (i < line.words.length - 1) parts.push(`{\\1c${primary}\\fscx100\\fscy100} `);
   }
 
   return parts.join("");

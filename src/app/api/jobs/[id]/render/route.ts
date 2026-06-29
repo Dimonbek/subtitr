@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { renderJob } from "@/lib/render";
-import { getJob, loadJobFromDisk } from "@/lib/jobs";
-import type { StylePreset } from "@/types/job";
+import { getJobFresh } from "@/lib/jobs";
+import { STYLE_PRESETS } from "@/lib/style-presets";
 
 export const runtime = "nodejs";
 
 const bodySchema = z.object({
-  preset: z.enum(["tiktok", "mrbeast", "minimal", "neon"]),
+  preset: z.string(),
+  font: z.string().optional(),
 });
 
 export async function POST(
@@ -15,19 +16,22 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const job = getJob(id) ?? (await loadJobFromDisk(id));
+  const job = await getJobFresh(id);
   if (!job) {
     return NextResponse.json({ error: "Job topilmadi" }, { status: 404 });
   }
 
-  let body: { preset: StylePreset["id"] };
+  let body: { preset: string; font?: string };
   try {
     body = bodySchema.parse(await request.json());
   } catch {
     return NextResponse.json({ error: "Noto'g'ri so'rov" }, { status: 400 });
   }
+  if (!STYLE_PRESETS[body.preset]) {
+    return NextResponse.json({ error: "Noma'lum uslub" }, { status: 400 });
+  }
 
-  void renderJob(id, body.preset).catch((err: unknown) => {
+  void renderJob(id, body.preset, body.font).catch((err: unknown) => {
     console.error("[render] xato", err);
   });
 

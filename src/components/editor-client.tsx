@@ -9,14 +9,16 @@ import {
   ArrowLeft,
   AlertTriangle,
   RotateCcw,
+  Crown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { StylePresetPicker } from "@/components/style-preset-picker";
+import { FontPicker } from "@/components/font-picker";
 import { TranscriptEditor } from "@/components/transcript-editor";
 import { formatDuration } from "@/lib/utils";
-import type { Job, StylePreset, Transcript } from "@/types/job";
+import type { Job, Transcript } from "@/types/job";
 
 interface EditorClientProps {
   jobId: string;
@@ -25,8 +27,12 @@ interface EditorClientProps {
 
 export function EditorClient({ jobId, initialJob }: EditorClientProps) {
   const [job, setJob] = useState<Job>(initialJob);
-  const [preset, setPreset] = useState<StylePreset["id"]>("tiktok");
+  const [preset, setPreset] = useState<string>("tiktok");
+  const [font, setFont] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // TODO: haqiqiy obuna tizimi qo'shilganda buni foydalanuvchi holatiga bog'lash.
+  // Hozircha sinov uchun premium uslub/shriftlar ochiq.
+  const isPro = true;
   // SSE qayta ulanish uchun versiya — bump qilsak useEffect qayta ishlaydi
   const [sseVersion, setSseVersion] = useState(0);
   const sseRef = useRef<EventSource | null>(null);
@@ -70,11 +76,11 @@ export function EditorClient({ jobId, initialJob }: EditorClientProps) {
       const res = await fetch(`/api/jobs/${jobId}/render`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ preset }),
+        body: JSON.stringify({ preset, font }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Render boshlanmadi");
+        throw new Error(data.error ?? "Tayyorlash boshlanmadi");
       }
       // SSE qayta ulanishi uchun job statusini "rendering" ga o'zgartirib, version bump qilamiz
       setJob((prev) => ({ ...prev, status: "rendering", progress: 0, error: undefined }));
@@ -83,7 +89,7 @@ export function EditorClient({ jobId, initialJob }: EditorClientProps) {
       console.error(err);
       setBusy(false);
     }
-  }, [jobId, preset]);
+  }, [jobId, preset, font]);
 
   const requestRetranscribe = useCallback(async () => {
     if (!confirm("Qayta tarjima qilamizmi? Mavjud tahrirlar o'chiriladi.")) return;
@@ -173,6 +179,25 @@ export function EditorClient({ jobId, initialJob }: EditorClientProps) {
                   selected={preset}
                   onSelect={setPreset}
                   disabled={isProcessing}
+                  isPro={isPro}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-1.5 text-base">
+                  Shrift
+                  <Crown className="h-3.5 w-3.5 text-amber-500" />
+                  <span className="text-xs font-normal text-muted-foreground">Premium</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <FontPicker
+                  selected={font}
+                  onSelect={setFont}
+                  disabled={isProcessing}
+                  isPro={isPro}
                 />
               </CardContent>
             </Card>
@@ -201,7 +226,7 @@ export function EditorClient({ jobId, initialJob }: EditorClientProps) {
                   ) : (
                     <>
                       <Sparkles className="h-5 w-5" />
-                      {isDone ? "Qaytadan render qilish" : "Subtitrni render qilish"}
+                      {isDone ? "Qayta tayyorlash" : "Tayyorlash"}
                     </>
                   )}
                 </Button>
@@ -269,8 +294,8 @@ function statusLabel(status: Job["status"]): string {
     uploading: "Yuklanmoqda",
     extracting_audio: "Audio chiqarilmoqda",
     transcribing: "Nutq aniqlanmoqda",
-    ready_to_render: "Render uchun tayyor",
-    rendering: "Render qilinmoqda",
+    ready_to_render: "Tayyorlashga tayyor",
+    rendering: "Tayyorlanmoqda",
     done: "Tayyor",
     failed: "Xato",
   }[status];
