@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Crown, Loader2, KeyRound, Mail, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PLANS, PRICING_NOTE, formatUzs } from "@/lib/pricing";
 
 const TELEGRAM = process.env.NEXT_PUBLIC_TELEGRAM_ADMIN || "dimonbek";
 
@@ -67,6 +68,24 @@ export function ProUnlock({ onUnlocked }: ProUnlockProps) {
       </div>
       <p className="mb-3 text-sm text-muted-foreground">
         Premium uslublar va shriftlardan foydalanish uchun obuna kerak.
+      </p>
+
+      {/* Narxlar — Captions.ai'dan 3× arzon */}
+      <div className="mb-3 grid grid-cols-3 gap-2">
+        {PLANS.map((p) => (
+          <div
+            key={p.id}
+            className={`rounded-lg border p-2 text-center ${
+              p.highlight ? "border-brand bg-brand/5" : "border-border"
+            }`}
+          >
+            <div className="text-xs text-muted-foreground">{p.label}</div>
+            <div className="text-sm font-bold">{formatUzs(p.priceUzs)}</div>
+          </div>
+        ))}
+      </div>
+      <p className="mb-3 text-center text-xs text-emerald-600 dark:text-emerald-400">
+        ⚡ {PRICING_NOTE}
       </p>
 
       {TELEGRAM && (

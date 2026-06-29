@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Check, Pencil } from "lucide-react";
+import { Loader2, Check, Pencil, FileText, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDuration } from "@/lib/utils";
 import type { Transcript } from "@/types/job";
@@ -18,6 +18,38 @@ export function TranscriptEditor({ jobId, transcript, disabled, onSaved }: Trans
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // E'tibor (reference) matni
+  const [showRef, setShowRef] = useState(false);
+  const [refText, setRefText] = useState("");
+  const [applyingRef, setApplyingRef] = useState(false);
+
+  const applyReference = async () => {
+    if (!refText.trim()) return;
+    setApplyingRef(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/reference`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: refText }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Qo'llashda xato");
+      }
+      const job = await fetch(`/api/jobs/${jobId}`).then((r) => r.json());
+      if (job?.transcript) {
+        onSaved?.(job.transcript);
+        setDrafts(job.transcript.segments.map((s: { text: string }) => s.text));
+      }
+      setShowRef(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Noma'lum xato");
+    } finally {
+      setApplyingRef(false);
+    }
+  };
 
   // Yangi transkript kelganda draft'larni yangilash (faqat tahrir qilinmagan bo'lsa)
   useEffect(() => {
@@ -80,6 +112,14 @@ export function TranscriptEditor({ jobId, transcript, disabled, onSaved }: Trans
           )}
           <Button
             size="sm"
+            variant="outline"
+            onClick={() => setShowRef((v) => !v)}
+            disabled={disabled || saving}
+          >
+            <FileText className="h-4 w-4" /> E&apos;tibor matni
+          </Button>
+          <Button
+            size="sm"
             variant={isDirty ? "brand" : "outline"}
             onClick={save}
             disabled={disabled || saving || !isDirty}
@@ -89,6 +129,41 @@ export function TranscriptEditor({ jobId, transcript, disabled, onSaved }: Trans
           </Button>
         </div>
       </div>
+
+      {showRef && (
+        <div className="rounded-lg border border-brand/40 bg-brand/5 p-3">
+          <div className="mb-2 flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-brand" />
+            <span className="text-sm font-medium">Videodagi to&apos;liq matn</span>
+          </div>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Videodagi nutqning to&apos;liq, to&apos;g&apos;ri matnini (masalan she&apos;r yoki ssenariy)
+            shu yerga joylashtiring. Tizim so&apos;zlarni vaqtga moslab, aniq yozib chiqadi.
+          </p>
+          <textarea
+            value={refText}
+            onChange={(e) => setRefText(e.target.value)}
+            disabled={applyingRef}
+            rows={5}
+            placeholder="Masalan: Assalomu alaykum, bugun siz bilan..."
+            className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand/40"
+          />
+          <div className="mt-2 flex items-center justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setShowRef(false)} disabled={applyingRef}>
+              Bekor
+            </Button>
+            <Button
+              variant="brand"
+              size="sm"
+              onClick={applyReference}
+              disabled={applyingRef || !refText.trim()}
+            >
+              {applyingRef ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              Matnni qo&apos;llash
+            </Button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-md border border-destructive/50 bg-destructive/5 p-2 text-sm text-destructive">

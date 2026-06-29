@@ -122,7 +122,7 @@ export function UploadDropzone({ className }: UploadDropzoneProps) {
           <div className="space-y-1">
             <p className="text-lg font-semibold">Videoni shu yerga tashlang</p>
             <p className="text-sm text-muted-foreground">
-              yoki bosing va fayl tanlang · MP4, MOV, MKV, WEBM · 500 MB gacha
+              yoki bosing va fayl tanlang · MP4, MOV, MKV, WEBM · 200 MB gacha
             </p>
           </div>
         )}

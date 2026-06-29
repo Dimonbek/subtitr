@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { promises as fs } from "node:fs";
+import { createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { randomUUID } from "node:crypto";
 import { paths, ensureJobDirs } from "@/lib/paths";
 import { setJob } from "@/lib/jobs";
@@ -8,7 +10,8 @@ import type { Job } from "@/types/job";
 
 export const runtime = "nodejs";
 
-const MAX_BYTES = Number(process.env.MAX_UPLOAD_BYTES ?? 524_288_000);
+// Default 200MB. Railway'da MAX_UPLOAD_BYTES env bilan o'zgartiriladi.
+const MAX_BYTES = Number(process.env.MAX_UPLOAD_BYTES ?? 209_715_200);
 
 export async function POST(request: Request) {
   let formData: FormData;
@@ -36,8 +39,10 @@ export async function POST(request: Request) {
   await ensureJobDirs(jobId);
 
   try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await fs.writeFile(paths.sourceVideo(jobId), buffer);
+    // Faylni bo'lak-bo'lak diskka yozamiz (butun faylni xotiraga ikki marta
+    // nusxalamaslik uchun — arrayBuffer() o'rniga stream).
+    const nodeStream = Readable.fromWeb(file.stream() as Parameters<typeof Readable.fromWeb>[0]);
+    await pipeline(nodeStream, createWriteStream(paths.sourceVideo(jobId)));
   } catch (err) {
     console.error("[upload] yozish xatosi", err);
     return NextResponse.json({ error: "Faylni saqlashda xato" }, { status: 500 });
