@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Crown, Loader2, KeyRound, Mail, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const TELEGRAM = process.env.NEXT_PUBLIC_TELEGRAM_ADMIN || "";
+const TELEGRAM = process.env.NEXT_PUBLIC_TELEGRAM_ADMIN || "dimonbek";
 
 interface ProUnlockProps {
   onUnlocked: (until: number, identity: string) => void;
