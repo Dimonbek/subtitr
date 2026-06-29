@@ -3,12 +3,18 @@ import type { Transcript, WordToken } from "@/types/job";
 import { groupWordsIntoSegments } from "./segment-words";
 import { ensureLatin } from "./cyrillic-latin";
 import type { Transcriber } from "./transcribe-types";
-import { getElevenLabsKeys, getCurrentIndex, setCurrentIndex, maskKey } from "./elevenlabs-keys";
-import { getElevenLabsUsage } from "./elevenlabs-usage";
+import {
+  getElevenLabsKeys,
+  getCurrentIndex,
+  setCurrentIndex,
+  getKeyUsage,
+  addKeyUsage,
+  markKeyExhausted,
+  maskKey,
+} from "./elevenlabs-keys";
 
 const ENDPOINT = "https://api.elevenlabs.io/v1/speech-to-text";
-// Kalitda shu kreditdan kam qolsa — keyingisiga o'tamiz
-const MIN_CREDITS = 50;
+const SKIP_MARGIN = 50; // qolgan kredit shundan kam bo'lsa — kalitni o'tkazib yuboramiz
 
 interface ElevenWord {
   text: string;
@@ -37,12 +43,13 @@ function toIso3(language: string): string {
   return map[language] ?? language;
 }
 
-/** Bitta kalit bilan transkripsiya qiladi. Kredit tugagan bo'lsa QuotaError. */
+/** Bitta kalit bilan transkripsiya qiladi. Kredit tugagan bo'lsa QuotaError.
+ *  Natija bilan birga sarflangan kreditni (character-cost) qaytaradi. */
 async function transcribeWithKey(
   audioPath: string,
   language: string,
   apiKey: string,
-): Promise<Transcript> {
+): Promise<{ transcript: Transcript; cost: number }> {
   const model = process.env.ELEVENLABS_MODEL?.trim() || "scribe_v1";
   const buffer = await fs.readFile(audioPath);
   const blob = new Blob([new Uint8Array(buffer)], { type: "audio/wav" });
@@ -86,7 +93,11 @@ async function transcribeWithKey(
       : [{ start: 0, end: 0, text: data.text ?? "", words: [] }];
   const duration = words.length > 0 ? words[words.length - 1].end : 0;
 
-  return { language: data.language_code ?? language, duration, segments };
+  const cost = Number(res.headers.get("character-cost") ?? 0) || 0;
+  return {
+    transcript: { language: data.language_code ?? language, duration, segments },
+    cost,
+  };
 }
 
 export const elevenLabsTranscriber: Transcriber = {
@@ -95,29 +106,31 @@ export const elevenLabsTranscriber: Transcriber = {
     if (keys.length === 0) throw new Error("ELEVENLABS kaliti topilmadi");
 
     const start = (await getCurrentIndex()) % keys.length;
-    // currentIndex'dan boshlab aylanma tartibda sinaymiz
+    // currentIndex'dan boshlab aylanma tartibda sinaymiz. Lokal hisobda krediti
+    // kam qolgan kalitni o'tkazib yuboramiz; STT kredit xatosi (QuotaError) bo'lsa
+    // o'sha kalitni tugagan deb belgilab keyingisiga o'tamiz.
     for (let off = 0; off < keys.length; off++) {
       const idx = (start + off) % keys.length;
       const key = keys[idx];
 
-      // Avval qolgan kreditni tekshiramiz (arzon API chaqiruvi)
-      const usage = await getElevenLabsUsage(key);
-      if (usage.available && usage.remaining < MIN_CREDITS) {
-        console.log(`[elevenlabs] kalit ${maskKey(key)} kredit tugagan (${usage.remaining}), keyingisi`);
-        continue;
+      const { remaining } = await getKeyUsage(key);
+      if (remaining < SKIP_MARGIN) {
+        continue; // lokal hisobda kredit tugagan — keyingisi
       }
 
       try {
-        const result = await transcribeWithKey(audioPath, language, key);
-        await setCurrentIndex(idx); // muvaffaqiyatli — shu kalitda qolamiz
-        console.log(`[elevenlabs] kalit ${maskKey(key)} ishlatildi`);
-        return result;
+        const { transcript, cost } = await transcribeWithKey(audioPath, language, key);
+        await addKeyUsage(key, cost);
+        await setCurrentIndex(idx);
+        console.log(`[elevenlabs] kalit #${idx + 1} ${maskKey(key)} (cost ${cost})`);
+        return transcript;
       } catch (e) {
         if (e instanceof QuotaError) {
-          console.log(`[elevenlabs] kalit ${maskKey(key)} kredit tugadi, keyingisiga o'tamiz`);
+          await markKeyExhausted(key);
+          console.log(`[elevenlabs] kalit #${idx + 1} ${maskKey(key)} kredit tugadi, keyingisiga`);
           continue;
         }
-        throw e; // haqiqiy xato — boshqa kalitlarni behuda sarflamaymiz
+        throw e;
       }
     }
 
