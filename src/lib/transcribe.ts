@@ -2,7 +2,8 @@ import { createReadStream } from "node:fs";
 import OpenAI from "openai";
 import type { Transcript, TranscriptSegment, WordToken } from "@/types/job";
 import type { Transcriber } from "./transcribe-types";
-import { elevenLabsTranscriber } from "./transcribe-elevenlabs";
+import { elevenLabsTranscriber, QuotaError } from "./transcribe-elevenlabs";
+import { getElevenLabsKeys } from "./elevenlabs-keys";
 
 export type { Transcriber } from "./transcribe-types";
 
@@ -133,10 +134,14 @@ export type ProviderKind = "elevenlabs" | "whisper";
  * Ustuvorlik: ElevenLabs Scribe (o'zbek uchun eng aniq) > Groq/OpenAI Whisper.
  */
 function resolveTranscriber(): { transcriber: Transcriber; kind: ProviderKind; name: string } {
-  if (process.env.ELEVENLABS_API_KEY?.trim()) {
+  if (getElevenLabsKeys().length > 0) {
     return { transcriber: elevenLabsTranscriber, kind: "elevenlabs", name: "ElevenLabs Scribe" };
   }
   return { transcriber: whisperTranscriber, kind: "whisper", name: "Whisper" };
+}
+
+function hasWhisperKey(): boolean {
+  return Boolean(process.env.GROQ_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim());
 }
 
 /** Hozir faol bo'lgan provider turini qaytaradi (post-processing intensivligini tanlash uchun). */
@@ -146,8 +151,17 @@ export function getActiveProviderKind(): ProviderKind {
 
 export const defaultTranscriber: Transcriber = {
   async transcribe(audioPath, language) {
-    const { transcriber, name } = resolveTranscriber();
+    const { transcriber, kind, name } = resolveTranscriber();
     console.log(`[transcribe] provider: ${name}`);
-    return transcriber.transcribe(audioPath, language);
+    try {
+      return await transcriber.transcribe(audioPath, language);
+    } catch (e) {
+      // ElevenLabs'ning barcha kalitlarida kredit tugagan bo'lsa — Whisper'ga o'tamiz
+      if (kind === "elevenlabs" && e instanceof QuotaError && hasWhisperKey()) {
+        console.warn("[transcribe] ElevenLabs kredit tugadi → Groq Whisper'ga o'tildi");
+        return whisperTranscriber.transcribe(audioPath, language);
+      }
+      throw e;
+    }
   },
 };

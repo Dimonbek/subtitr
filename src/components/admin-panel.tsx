@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Plus, Trash2, Copy, Check, KeyRound, Mail } from "lucide-react";
+import { Loader2, Plus, Trash2, Copy, Check, KeyRound, Mail, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -19,6 +19,16 @@ interface EmailGrant {
   expiresAt: number;
   createdAt: number;
   note?: string;
+}
+interface ElevenKey {
+  index: number;
+  masked: string;
+  active: boolean;
+  available: boolean;
+  used: number;
+  limit: number;
+  remaining: number;
+  error?: string;
 }
 
 function fmt(ts?: number): string {
@@ -38,7 +48,24 @@ export function AdminPanel() {
 
   const [codes, setCodes] = useState<PromoCode[]>([]);
   const [emails, setEmails] = useState<EmailGrant[]>([]);
+  const [elKeys, setElKeys] = useState<ElevenKey[]>([]);
+  const [elTotal, setElTotal] = useState(0);
+  const [elLoading, setElLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const refreshEleven = useCallback(async () => {
+    setElLoading(true);
+    try {
+      const res = await fetch("/api/admin/elevenlabs");
+      if (res.ok) {
+        const data = await res.json();
+        setElKeys(data.keys ?? []);
+        setElTotal(data.totalRemaining ?? 0);
+      }
+    } finally {
+      setElLoading(false);
+    }
+  }, []);
 
   const [codeDays, setCodeDays] = useState(30);
   const [grantEmail, setGrantEmail] = useState("");
@@ -63,6 +90,10 @@ export function AdminPanel() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (authed) void refreshEleven();
+  }, [authed, refreshEleven]);
 
   const login = async () => {
     setAuthBusy(true);
@@ -147,6 +178,55 @@ export function AdminPanel() {
   return (
     <div className="mx-auto w-full max-w-4xl px-6 py-8 space-y-6">
       <h1 className="text-2xl font-bold tracking-tight">Admin panel</h1>
+
+      {/* ElevenLabs kreditlari */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Zap className="h-4 w-4 text-amber-500" /> ElevenLabs kreditlari
+            <span className="ml-auto text-sm font-normal text-muted-foreground">
+              Jami qolgan: <b className="text-foreground">{elTotal.toLocaleString()}</b>
+            </span>
+            <Button variant="ghost" size="sm" onClick={refreshEleven} disabled={elLoading}>
+              {elLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Yangilash"}
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-1.5">
+          {elKeys.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Kalit topilmadi. `ELEVENLABS_API_KEYS` ga vergul bilan 9 ta kalitni qo'ying.
+            </p>
+          )}
+          {elKeys.map((k) => {
+            const pct = k.limit > 0 ? Math.round((k.remaining / k.limit) * 100) : 0;
+            return (
+              <div key={k.index} className="flex items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2 text-sm">
+                <span className="font-mono text-xs">#{k.index + 1}</span>
+                <span className="font-mono text-xs text-muted-foreground">{k.masked}</span>
+                {k.active && (
+                  <span className="rounded-full bg-brand/15 px-2 py-0.5 text-xs text-brand">faol</span>
+                )}
+                {k.available ? (
+                  <>
+                    <div className="ml-2 h-2 flex-1 overflow-hidden rounded-full bg-secondary">
+                      <div
+                        className={pct > 20 ? "h-full bg-emerald-500" : "h-full bg-rose-500"}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <span className="tabular-nums text-xs">
+                      {k.remaining.toLocaleString()} / {k.limit.toLocaleString()}
+                    </span>
+                  </>
+                ) : (
+                  <span className="ml-auto text-xs text-rose-500">{k.error ?? "xato"}</span>
+                )}
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
 
       {/* Promokod yaratish */}
       <Card>
