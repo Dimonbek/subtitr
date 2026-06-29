@@ -147,20 +147,18 @@ function buildDialogueLine(line: Line, preset: StylePreset, endTime: number): st
 }
 
 function buildKaraokeText(line: Line, preset: StylePreset): string {
-  // Captions.ai/Submagic uslubi: faqat rang almashishi (per-word scale yo'q).
-  // Vaqt \t ichida millisekundlarda Dialogue boshidan hisoblanadi.
-  // Format: \t(t1,t2,\1c&Hcolor&) — t1 dan t2 gacha rang o'zgaradi.
+  // Captions.ai/Submagic uslubi: FAQAT aytilayotgan so'z highlight rangida,
+  // qolganlari primary. ASS'da \1c "cascade" qiladi (keyingi matnga oqib o'tadi),
+  // shuning uchun HAR SO'Z bloki static \1c primary bilan boshlanadi — bu oldingi
+  // so'zning highlight'ini bekor qiladi. Natijada faqat faol so'z rang oladi.
   const primary = inlineColor(preset.primaryColor);
   const highlight = inlineColor(preset.highlightColor);
-  // Color transition uchun qisqa fade — 80ms — silliq ko'rinish uchun
-  const COLOR_FADE_MS = 60;
-  // Qator boshida ko'rinish uchun yumshoq fade-in/out (150ms in, 0 out)
-  const LINE_FADE_IN = 150;
-  const LINE_FADE_OUT = 80;
+  const COLOR_FADE_MS = 50; // rang o'tishi uchun qisqa silliq fade
+  const LINE_FADE_IN = 120;
+  const LINE_FADE_OUT = 60;
 
   const parts: string[] = [];
-  // Boshlanish: qator fade-in + barcha so'zlar primary rangda
-  parts.push(`{\\fad(${LINE_FADE_IN},${LINE_FADE_OUT})\\1c${primary}}`);
+  parts.push(`{\\fad(${LINE_FADE_IN},${LINE_FADE_OUT})}`);
 
   for (let i = 0; i < line.words.length; i++) {
     const w = line.words[i];
@@ -168,12 +166,13 @@ function buildKaraokeText(line: Line, preset: StylePreset): string {
     const endMs = Math.max(startMs + 40, Math.round((w.end - line.start) * 1000));
     const cleaned = sanitizeWord(w.word);
     if (!cleaned) continue;
-    // So'z boshlanganda highlight'ga, oxirida primary'ga qaytadi. Qisqa fade.
+    // static \1c primary (cascade reset) + faqat shu so'z oynasida highlight
     parts.push(
-      `{\\t(${startMs},${startMs + COLOR_FADE_MS},\\1c${highlight})\\t(${endMs},${endMs + COLOR_FADE_MS},\\1c${primary})}`,
+      `{\\1c${primary}\\t(${startMs},${startMs + COLOR_FADE_MS},\\1c${highlight})\\t(${endMs},${endMs + COLOR_FADE_MS},\\1c${primary})}`,
     );
     parts.push(cleaned);
-    if (i < line.words.length - 1) parts.push(" ");
+    // Bo'sh joy ham primary (cascade'siz)
+    if (i < line.words.length - 1) parts.push(`{\\1c${primary}} `);
   }
 
   return parts.join("");
