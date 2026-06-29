@@ -16,23 +16,30 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { StylePresetPicker } from "@/components/style-preset-picker";
 import { FontPicker } from "@/components/font-picker";
+import { ProUnlock } from "@/components/pro-unlock";
 import { TranscriptEditor } from "@/components/transcript-editor";
+import { STYLE_PRESETS } from "@/lib/style-presets";
+import { CAPTION_FONTS } from "@/lib/fonts";
 import { formatDuration } from "@/lib/utils";
 import type { Job, Transcript } from "@/types/job";
 
 interface EditorClientProps {
   jobId: string;
   initialJob: Job;
+  initialPro: boolean;
 }
 
-export function EditorClient({ jobId, initialJob }: EditorClientProps) {
+export function EditorClient({ jobId, initialJob, initialPro }: EditorClientProps) {
   const [job, setJob] = useState<Job>(initialJob);
   const [preset, setPreset] = useState<string>("tiktok");
   const [font, setFont] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // TODO: haqiqiy obuna tizimi qo'shilganda buni foydalanuvchi holatiga bog'lash.
-  // Hozircha sinov uchun premium uslub/shriftlar ochiq.
-  const isPro = true;
+  const [isPro, setIsPro] = useState(initialPro);
+
+  // Tanlangan uslub yoki shrift premium-u, lekin foydalanuvchi pro emas — ruxsat kerak
+  const presetPremium = STYLE_PRESETS[preset]?.premium ?? false;
+  const fontPremium = font ? (CAPTION_FONTS.find((f) => f.id === font)?.premium ?? false) : false;
+  const needsPro = (presetPremium || fontPremium) && !isPro;
   // SSE qayta ulanish uchun versiya — bump qilsak useEffect qayta ishlaydi
   const [sseVersion, setSseVersion] = useState(0);
   const sseRef = useRef<EventSource | null>(null);
@@ -202,6 +209,12 @@ export function EditorClient({ jobId, initialJob }: EditorClientProps) {
               </CardContent>
             </Card>
 
+            {needsPro && (
+              <ProUnlock
+                onUnlocked={(_until, _id) => setIsPro(true)}
+              />
+            )}
+
             <div className="flex flex-col gap-2">
               {isDone && (
                 <Button size="xl" variant="brand" asChild>
@@ -217,11 +230,15 @@ export function EditorClient({ jobId, initialJob }: EditorClientProps) {
                   size={isDone ? "lg" : "xl"}
                   variant={isDone ? "outline" : "brand"}
                   onClick={requestRender}
-                  disabled={!canAct}
+                  disabled={!canAct || needsPro}
                 >
                   {busy ? (
                     <>
                       <Loader2 className="h-5 w-5 animate-spin" /> Boshlanmoqda...
+                    </>
+                  ) : needsPro ? (
+                    <>
+                      <Crown className="h-5 w-5" /> Premium kerak
                     </>
                   ) : (
                     <>
