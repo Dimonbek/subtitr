@@ -18,5 +18,12 @@ export default async function EditorPage({
   const store = await cookies();
   const access = await getViewerAccess(store.get(ACCESS_COOKIE)?.value);
 
-  return <EditorClient jobId={jobId} initialJob={job} initialPro={access.isPro} />;
+  return (
+    <EditorClient
+      jobId={jobId}
+      initialJob={job}
+      initialPro={access.isPro}
+      initialCoins={access.coins}
+    />
+  );
 }

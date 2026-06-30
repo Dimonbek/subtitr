@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { redeemCode } from "@/lib/access-store";
-import { ACCESS_COOKIE, signAccess } from "@/lib/access";
+import { ACCESS_COOKIE, ensureViewer, getViewerAccess, signSubject } from "@/lib/access";
 
 export const runtime = "nodejs";
 
@@ -15,17 +16,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Kod noto'g'ri" }, { status: 400 });
   }
 
-  const result = await redeemCode(body.code);
+  const store = await cookies();
+  const existing = store.get(ACCESS_COOKIE)?.value;
+  const { subjectId, created } = await ensureViewer(existing);
+
+  const result = await redeemCode(body.code, subjectId);
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  const res = NextResponse.json({ ok: true, until: result.until });
-  res.cookies.set(ACCESS_COOKIE, signAccess({ kind: "code", until: result.until }), {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 90,
-  });
+  const access = await getViewerAccess(signSubject(subjectId));
+  const res = NextResponse.json({ ok: true, ...result, access });
+  if (created) {
+    res.cookies.set(ACCESS_COOKIE, signSubject(subjectId), {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
   return res;
 }

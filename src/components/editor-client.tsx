@@ -9,17 +9,15 @@ import {
   ArrowLeft,
   AlertTriangle,
   RotateCcw,
-  Crown,
+  Coins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { StylePresetPicker } from "@/components/style-preset-picker";
 import { FontPicker } from "@/components/font-picker";
-import { ProUnlock } from "@/components/pro-unlock";
+import { CoinShop } from "@/components/coin-shop";
 import { TranscriptEditor } from "@/components/transcript-editor";
-import { STYLE_PRESETS } from "@/lib/style-presets";
-import { CAPTION_FONTS } from "@/lib/fonts";
 import { formatDuration } from "@/lib/utils";
 import type { Job, Transcript } from "@/types/job";
 
@@ -27,19 +25,20 @@ interface EditorClientProps {
   jobId: string;
   initialJob: Job;
   initialPro: boolean;
+  initialCoins: number;
 }
 
-export function EditorClient({ jobId, initialJob, initialPro }: EditorClientProps) {
+export function EditorClient({ jobId, initialJob, initialPro, initialCoins }: EditorClientProps) {
   const [job, setJob] = useState<Job>(initialJob);
   const [preset, setPreset] = useState<string>("tiktok");
   const [font, setFont] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [isPro, setIsPro] = useState(initialPro);
+  const [coins, setCoins] = useState(initialCoins);
+  const [showShop, setShowShop] = useState(false);
 
-  // Tanlangan uslub yoki shrift premium-u, lekin foydalanuvchi pro emas — ruxsat kerak
-  const presetPremium = STYLE_PRESETS[preset]?.premium ?? false;
-  const fontPremium = font ? (CAPTION_FONTS.find((f) => f.id === font)?.premium ?? false) : false;
-  const needsPro = (presetPremium || fontPremium) && !isPro;
+  // Coin yo'q va obuna ham yo'q — tayyorlash uchun sotib olish kerak
+  const canRender = isPro || coins > 0;
   // SSE qayta ulanish uchun versiya — bump qilsak useEffect qayta ishlaydi
   const [sseVersion, setSseVersion] = useState(0);
   const sseRef = useRef<EventSource | null>(null);
@@ -85,10 +84,18 @@ export function EditorClient({ jobId, initialJob, initialPro }: EditorClientProp
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ preset, font }),
       });
+      if (res.status === 402) {
+        // Coin yetarli emas — do'konni ochamiz
+        setShowShop(true);
+        setBusy(false);
+        return;
+      }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "Tayyorlash boshlanmadi");
       }
+      // Obuna bo'lmasa 1 coin yechildi
+      if (!isPro) setCoins((c) => Math.max(0, c - 1));
       // SSE qayta ulanishi uchun job statusini "rendering" ga o'zgartirib, version bump qilamiz
       setJob((prev) => ({ ...prev, status: "rendering", progress: 0, error: undefined }));
       setSseVersion((v) => v + 1);
@@ -96,7 +103,7 @@ export function EditorClient({ jobId, initialJob, initialPro }: EditorClientProp
       console.error(err);
       setBusy(false);
     }
-  }, [jobId, preset, font]);
+  }, [jobId, preset, font, isPro]);
 
   const requestRetranscribe = useCallback(async () => {
     if (!confirm("Qayta tarjima qilamizmi? Mavjud tahrirlar o'chiriladi.")) return;
@@ -186,32 +193,46 @@ export function EditorClient({ jobId, initialJob, initialPro }: EditorClientProp
                   selected={preset}
                   onSelect={setPreset}
                   disabled={isProcessing}
-                  isPro={isPro}
+                  isPro
                 />
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-1.5 text-base">
-                  Shrift
-                  <Crown className="h-3.5 w-3.5 text-amber-500" />
-                  <span className="text-xs font-normal text-muted-foreground">Premium</span>
-                </CardTitle>
+                <CardTitle className="flex items-center gap-1.5 text-base">Shrift</CardTitle>
               </CardHeader>
               <CardContent>
-                <FontPicker
-                  selected={font}
-                  onSelect={setFont}
-                  disabled={isProcessing}
-                  isPro={isPro}
-                />
+                <FontPicker selected={font} onSelect={setFont} disabled={isProcessing} isPro />
               </CardContent>
             </Card>
 
-            {needsPro && (
-              <ProUnlock
-                onUnlocked={(_until, _id) => setIsPro(true)}
+            {/* Coin balansi */}
+            <div className="flex items-center justify-between rounded-lg border bg-card px-3 py-2 text-sm">
+              <span className="flex items-center gap-1.5">
+                <Coins className="h-4 w-4 text-amber-500" />
+                {isPro ? (
+                  <span className="font-medium">Cheksiz obuna faol</span>
+                ) : (
+                  <span>
+                    Balans: <b>{coins}</b> coin
+                  </span>
+                )}
+              </span>
+              <Button variant="ghost" size="sm" onClick={() => setShowShop((v) => !v)}>
+                Coin sotib olish
+              </Button>
+            </div>
+
+            {(showShop || !canRender) && (
+              <CoinShop
+                coins={coins}
+                isPro={isPro}
+                onUpdated={(c, pro) => {
+                  setCoins(c);
+                  setIsPro(pro);
+                  if (pro || c > 0) setShowShop(false);
+                }}
               />
             )}
 
@@ -229,21 +250,22 @@ export function EditorClient({ jobId, initialJob, initialPro }: EditorClientProp
                 <Button
                   size={isDone ? "lg" : "xl"}
                   variant={isDone ? "outline" : "brand"}
-                  onClick={requestRender}
-                  disabled={!canAct || needsPro}
+                  onClick={canRender ? requestRender : () => setShowShop(true)}
+                  disabled={!canAct}
                 >
                   {busy ? (
                     <>
                       <Loader2 className="h-5 w-5 animate-spin" /> Boshlanmoqda...
                     </>
-                  ) : needsPro ? (
+                  ) : !canRender ? (
                     <>
-                      <Crown className="h-5 w-5" /> Premium kerak
+                      <Coins className="h-5 w-5" /> Coin sotib olish
                     </>
                   ) : (
                     <>
                       <Sparkles className="h-5 w-5" />
                       {isDone ? "Qayta tayyorlash" : "Tayyorlash"}
+                      {!isPro && <span className="ml-1 text-xs opacity-80">(1 coin)</span>}
                     </>
                   )}
                 </Button>

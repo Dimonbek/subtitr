@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { normalizeEmail } from "@/lib/access-store";
-import { ACCESS_COOKIE, signAccess, getViewerAccess } from "@/lib/access";
+import { emailSubjectId, ensureSubject } from "@/lib/access-store";
+import { ACCESS_COOKIE, signSubject, getViewerAccess } from "@/lib/access";
 
 export const runtime = "nodejs";
 
@@ -15,8 +15,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Email noto'g'ri" }, { status: 400 });
   }
 
-  const email = normalizeEmail(body.email);
-  const cookie = signAccess({ kind: "email", email });
+  const sid = emailSubjectId(body.email);
+  await ensureSubject(sid); // yangi email — 3 bepul coin
+  const cookie = signSubject(sid);
   const access = await getViewerAccess(cookie);
 
   const res = NextResponse.json(access);
