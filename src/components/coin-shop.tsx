@@ -5,7 +5,8 @@ import { Coins, Loader2, KeyRound, Mail, Send, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { COIN_PACKS, PLANS, PRICING_NOTE, formatUzs } from "@/lib/pricing";
 
-const TELEGRAM = process.env.NEXT_PUBLIC_TELEGRAM_ADMIN || "dimonbek";
+// @ belgisini olib tashlaymiz — t.me linki @ siz bo'ladi (t.me/dimonbek)
+const TELEGRAM = (process.env.NEXT_PUBLIC_TELEGRAM_ADMIN || "dimonbek").replace(/^@+/, "");
 
 interface CoinShopProps {
   coins: number;
@@ -105,7 +106,7 @@ export function CoinShop({ coins, isPro, onUpdated }: CoinShopProps) {
           <p className="text-center text-xs text-emerald-600 dark:text-emerald-400">⚡ {PRICING_NOTE}</p>
           <Button variant="brand" className="w-full" asChild>
             <a href={`https://t.me/${TELEGRAM}`} target="_blank" rel="noopener noreferrer">
-              <Send className="h-4 w-4" /> Telegram orqali sotib olish
+              <Send className="h-4 w-4" /> Telegram orqali sotib olish (@{TELEGRAM})
             </a>
           </Button>
         </div>
