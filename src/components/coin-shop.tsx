@@ -105,7 +105,7 @@ export function CoinShop({ coins, isPro, onUpdated }: CoinShopProps) {
           </div>
           <p className="text-center text-xs text-emerald-600 dark:text-emerald-400">⚡ {PRICING_NOTE}</p>
           <Button variant="brand" className="w-full" asChild>
-            <a href={`https://t.me/${TELEGRAM}`} target="_blank" rel="noopener noreferrer">
+            <a href="https://t.me/dimonbek" target="_blank" rel="noopener noreferrer">
               <Send className="h-4 w-4" /> Sotib olish
             </a>
           </Button>
