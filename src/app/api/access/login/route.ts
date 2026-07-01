@@ -1,23 +1,28 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { emailSubjectId, ensureSubject } from "@/lib/access-store";
-import { ACCESS_COOKIE, signSubject, getViewerAccess } from "@/lib/access";
+import { ACCESS_COOKIE, signSubject, getViewerAccess, loginUser } from "@/lib/access";
 
 export const runtime = "nodejs";
 
-const schema = z.object({ email: z.string().email() });
+const schema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1, "Parol kiritilishi shart"),
+});
 
 export async function POST(request: Request) {
-  let body: { email: string };
+  let body: { email: string; password: string };
   try {
     body = schema.parse(await request.json());
   } catch {
-    return NextResponse.json({ error: "Email noto'g'ri" }, { status: 400 });
+    return NextResponse.json({ error: "Email yoki parol noto'g'ri kiritildi" }, { status: 400 });
   }
 
-  const sid = emailSubjectId(body.email);
-  await ensureSubject(sid); // yangi email — 3 bepul coin
-  const cookie = signSubject(sid);
+  const result = await loginUser(body.email, body.password);
+  if (!result) {
+    return NextResponse.json({ error: "Email yoki parol noto'g'ri" }, { status: 401 });
+  }
+
+  const cookie = signSubject(result.subjectId);
   const access = await getViewerAccess(cookie);
 
   const res = NextResponse.json(access);

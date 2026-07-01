@@ -53,7 +53,7 @@ export function CoinShop({ coins, isPro, onUpdated }: CoinShopProps) {
       <div className="mb-3 flex items-center gap-2">
         <Coins className="h-5 w-5 text-amber-500" />
         <h3 className="font-semibold">
-          {isPro ? "Cheksiz obuna faol" : coins > 0 ? `Sizда ${coins} coin` : "Coin tugadi"}
+          {isPro ? "Cheksiz obuna faol" : coins > 0 ? `Sizda ${coins} coin` : "Coin tugadi"}
         </h3>
       </div>
 
@@ -106,7 +106,7 @@ export function CoinShop({ coins, isPro, onUpdated }: CoinShopProps) {
           <p className="text-center text-xs text-emerald-600 dark:text-emerald-400">⚡ {PRICING_NOTE}</p>
           <Button variant="brand" className="w-full" asChild>
             <a href={`https://t.me/${TELEGRAM}`} target="_blank" rel="noopener noreferrer">
-              <Send className="h-4 w-4" /> Telegram orqali sotib olish (@{TELEGRAM})
+              <Send className="h-4 w-4" /> Sotib olish
             </a>
           </Button>
         </div>

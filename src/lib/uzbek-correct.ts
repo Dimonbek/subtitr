@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import type { Transcript } from "@/types/job";
 import { redistributeWordTimings } from "./redistribute";
+import { turkishToUzbek } from "./turkish-to-uzbek";
 
 const SYSTEM_PROMPT = `Sen o'zbek tili imlo muharririsan. Senga nutq aniqlovchi (speech recognition) model yaratgan o'zbekcha matn beriladi. Vazifang — faqat IMLO xatolarini to'g'rilash.
 
@@ -10,13 +11,15 @@ QAT'IY QOIDALAR:
 
 2. ALIFBO — faqat o'zbek lotin alifbosi: a b d e f g h i j k l m n o p q r s t u v x y z, va o' g' sh ch ng. Turkcha harflar (ç ş ğ ı ö ü) bo'lsa o'zbekchasiga: ç→ch, ş→sh, ğ→g', ö→o', ü→u, ı→i.
 
-3. So'z allaqachon to'g'ri o'zbekcha bo'lsa — TEGMA, o'sha holicha qoldir.
+3. TURKCHA SO'ZLARNI O'ZBEKCHALASHTIR. Agar matnda turkcha so'zlar (masalan: "evet", "hayır", "yapıyor", "değil", "çünkü" kabi) uchrab qolsa, ularni butunlay o'zbekcha so'zlarga almashtir (evet -> ha, hayır -> yo'q, yapıyor -> qilyapti, değil -> emas, çünkü -> chunki va hokazo). Hech qanday turkcha so'z yoki turkcha ohang qolmasligi kerak, matn faqat toza o'zbek tilida bo'lishi shart.
 
-4. So'zlar SONI, TARTIBI va MA'NOSI o'zgarmasin. Yangi so'z qo'shma, so'z o'chirma.
+4. So'z allaqachon to'g'ri o'zbekcha bo'lsa — TEGMA, o'sha holicha qoldir.
 
-5. JUMLALAR SONI o'zgarmasin — nechta jumla berilsa, shuncha qaytar.
+5. So'zlar SONI, TARTIBI va MA'NOSI o'zgarmasin. Yangi so'z qo'shma, so'z o'chirma.
 
-6. Tinish belgilarini (.,!?) saqla.
+6. JUMLALAR SONI o'zgarmasin — nechta jumla berilsa, shuncha qaytar.
+
+7. Tinish belgilarini (.,!?) saqla.
 
 Javobni FAQAT shu JSON formatda ber, boshqa hech narsa yozma:
 {"corrected": ["1-jumla", "2-jumla", "3-jumla"]}`;
@@ -59,6 +62,21 @@ function getClient() {
   return cached;
 }
 
+/** Turkcha harflarni matndan tozalash funksiyasi */
+function cleanTranscriptTurkish(transcript: Transcript): Transcript {
+  return {
+    ...transcript,
+    segments: transcript.segments.map((seg) => ({
+      ...seg,
+      text: turkishToUzbek(seg.text),
+      words: seg.words.map((w) => ({
+        ...w,
+        word: turkishToUzbek(w.word),
+      })),
+    })),
+  };
+}
+
 /**
  * Whisper transkripsiyasini Groq LLM orqali o'zbek imlosiga moslashtirish.
  * Xatolik bo'lsa original transkriptni qaytaradi (graceful fallback).
@@ -70,7 +88,7 @@ export async function correctUzbekTranscript(transcript: Transcript): Promise<Tr
   const provider = getClient();
   if (!provider) {
     console.warn("[uzbek-correct] LLM provider topilmadi, original qaytariladi");
-    return transcript;
+    return cleanTranscriptTurkish(transcript);
   }
   const { client, config } = provider;
 
@@ -93,21 +111,24 @@ export async function correctUzbekTranscript(transcript: Transcript): Promise<Tr
     const raw = completion.choices[0]?.message?.content;
     if (!raw) {
       console.warn("[uzbek-correct] Bo'sh javob, original qaytariladi");
-      return transcript;
+      return cleanTranscriptTurkish(transcript);
     }
 
     const parsed = JSON.parse(raw) as { corrected?: string[] };
-    const corrected = Array.isArray(parsed.corrected) ? parsed.corrected : null;
+    const corrected = Array.isArray(parsed.corrected)
+      ? parsed.corrected.map((s) => turkishToUzbek(s))
+      : null;
     if (!corrected || corrected.length !== segments.length) {
       console.warn(
         `[uzbek-correct] Sonlar mos kelmadi (${corrected?.length} vs ${segments.length}), original qaytariladi`,
       );
-      return transcript;
+      return cleanTranscriptTurkish(transcript);
     }
 
-    return redistributeWordTimings(transcript, corrected);
+    const redistributed = redistributeWordTimings(transcript, corrected);
+    return cleanTranscriptTurkish(redistributed);
   } catch (err) {
     console.warn("[uzbek-correct] xato, original qaytariladi:", err);
-    return transcript;
+    return cleanTranscriptTurkish(transcript);
   }
 }

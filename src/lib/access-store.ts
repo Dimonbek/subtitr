@@ -7,6 +7,7 @@ import { WELCOME_COINS } from "./pricing";
 export interface Subject {
   id: string; // "email:foo@bar" yoki "anon:uuid"
   coins: number;
+  passwordHash?: string;
   expiresAt?: number; // cheksiz obuna tugash vaqti (bo'lsa)
   welcomeGiven: boolean;
   createdAt: number;
@@ -69,13 +70,31 @@ export async function ensureSubject(id: string): Promise<Subject> {
   if (!s) {
     s = {
       id,
-      coins: WELCOME_COINS,
-      welcomeGiven: true,
+      coins: 0,
+      welcomeGiven: false,
       createdAt: Date.now(),
     };
     db.subjects[id] = s;
     await save(db);
   }
+  return s;
+}
+
+/** Yangi foydalanuvchini email+parol bilan ro'yxatdan o'tkazadi. Agar allaqachon mavjud bo'lsa xato. */
+export async function registerSubject(id: string, passwordHash: string): Promise<Subject> {
+  const db = await load();
+  if (db.subjects[id]) {
+    throw new Error("Bu email allaqachon ro'yxatdan o'tgan");
+  }
+  const s: Subject = {
+    id,
+    coins: WELCOME_COINS,
+    passwordHash,
+    welcomeGiven: true,
+    createdAt: Date.now(),
+  };
+  db.subjects[id] = s;
+  await save(db);
   return s;
 }
 

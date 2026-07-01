@@ -3,6 +3,7 @@ import type { Transcript, WordToken } from "@/types/job";
 import { groupWordsIntoSegments } from "./segment-words";
 import { ensureLatin } from "./cyrillic-latin";
 import type { Transcriber } from "./transcribe-types";
+import { turkishToUzbek } from "./turkish-to-uzbek";
 import {
   getElevenLabsKeys,
   getCurrentIndex,
@@ -81,7 +82,7 @@ async function transcribeWithKey(
   const words: WordToken[] = (data.words ?? [])
     .filter((w) => w.type === "word" && typeof w.start === "number" && typeof w.end === "number")
     .map((w) => ({
-      word: ensureLatin(w.text.trim()),
+      word: turkishToUzbek(ensureLatin(w.text.trim())),
       start: w.start as number,
       end: w.end as number,
     }))
@@ -90,7 +91,7 @@ async function transcribeWithKey(
   const segments =
     words.length > 0
       ? groupWordsIntoSegments(words)
-      : [{ start: 0, end: 0, text: data.text ?? "", words: [] }];
+      : [{ start: 0, end: 0, text: turkishToUzbek(data.text ?? ""), words: [] }];
   const duration = words.length > 0 ? words[words.length - 1].end : 0;
 
   const cost = Number(res.headers.get("character-cost") ?? 0) || 0;

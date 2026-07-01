@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { ensureSubject, getSubject, isSubscribed } from "./access-store";
+import { ensureSubject, getSubject, isSubscribed, registerSubject } from "./access-store";
 
 export const ACCESS_COOKIE = "subtitr_sid";
 const SECRET = process.env.ACCESS_SECRET || "subtitr-dev-secret-change-me";
@@ -34,6 +34,38 @@ export function verifySubject(value: string | undefined): string | null {
 
 export function newAnonSubjectId(): string {
   return "anon:" + crypto.randomUUID();
+}
+
+/** Parolni SHA-256 bilan hash'laydi (oddiy, tezkor, serverda ishlatiladi). */
+export function hashPassword(password: string): string {
+  return crypto.createHash("sha256").update(password).digest("hex");
+}
+
+/** Parol hash'ini tekshiradi. */
+export function verifyPassword(password: string, hash: string): boolean {
+  const computed = hashPassword(password);
+  try {
+    return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(hash));
+  } catch {
+    return false;
+  }
+}
+
+/** Yangi foydalanuvchini ro'yxatdan o'tkazadi. */
+export async function registerUser(email: string, password: string): Promise<{ subjectId: string }> {
+  const sid = "email:" + email.trim().toLowerCase();
+  const hash = hashPassword(password);
+  await registerSubject(sid, hash);
+  return { subjectId: sid };
+}
+
+/** Email+parol bilan kirish. */
+export async function loginUser(email: string, password: string): Promise<{ subjectId: string } | null> {
+  const sid = "email:" + email.trim().toLowerCase();
+  const subject = await getSubject(sid);
+  if (!subject || !subject.passwordHash) return null;
+  if (!verifyPassword(password, subject.passwordHash)) return null;
+  return { subjectId: sid };
 }
 
 export interface ViewerAccess {

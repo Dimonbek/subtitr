@@ -1,7 +1,18 @@
 import { Sparkles, Languages, Type, Wand2 } from "lucide-react";
+import { cookies } from "next/headers";
 import { UploadDropzone } from "@/components/upload-dropzone";
+import { AuthFormWrapper } from "@/components/auth-form-wrapper";
+import { HeaderActions } from "@/components/header-actions";
+import { ACCESS_COOKIE, verifySubject, getViewerAccess } from "@/lib/access";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const store = await cookies();
+  const existing = store.get(ACCESS_COOKIE)?.value;
+  const sid = verifySubject(existing);
+  const isLoggedIn = sid && sid.startsWith("email:");
+
+  const access = isLoggedIn ? await getViewerAccess(existing) : null;
+
   return (
     <div className="flex flex-1 flex-col">
       <header className="border-b border-border/60 bg-background/80 backdrop-blur">
@@ -12,13 +23,20 @@ export default function HomePage() {
             </div>
             <span className="text-lg font-semibold tracking-tight">Subtitr</span>
           </div>
-          <nav className="hidden gap-6 text-sm text-muted-foreground md:flex">
-            <a href="#features" className="hover:text-foreground transition-colors">
+          <nav className="flex items-center gap-6 text-sm text-muted-foreground">
+            <a href="#features" className="hover:text-foreground transition-colors hidden md:inline">
               Imkoniyatlar
             </a>
-            <a href="#how" className="hover:text-foreground transition-colors">
+            <a href="#how" className="hover:text-foreground transition-colors hidden md:inline">
               Qanday ishlaydi
             </a>
+            {isLoggedIn && access && (
+              <HeaderActions
+                email={access.email ?? ""}
+                coins={access.coins}
+                isPro={access.isPro}
+              />
+            )}
           </nav>
         </div>
       </header>
@@ -37,8 +55,12 @@ export default function HomePage() {
           animatsiyali subtitrlarni avtomatik yopishtirib beradi.
         </p>
 
-        <div className="mt-12 w-full">
-          <UploadDropzone />
+        <div className="mt-12 w-full flex justify-center">
+          {isLoggedIn ? (
+            <UploadDropzone />
+          ) : (
+            <AuthFormWrapper />
+          )}
         </div>
 
         <section

@@ -64,7 +64,9 @@ const UZBEK_PROMPT =
   "ko'rsa izzat-ikrom ko'rsatadi, agar yomon ko'rmasa zulm va qattiqlik qilmaydi. " +
   "Har bir musulmon Allohga iymon keltirishi, namoz o'qishi, ro'za tutishi kerak. " +
   "Halol mehnat qilish, yaqinlarni qadrlash, do'stlarga sodiq bo'lish lozim. " +
-  "Bu matn o'zbek lotin alifbosida yozilgan, boshqa Turkiy tillar emas.";
+  "Bu matn faqat o'zbek lotin alifbosida yozilgan. Turkcha harflar (ç, ş, ğ, ö, ü, ı) yoki " +
+  "turkcha so'zlar (evet, hayır, yok, değil, arkadaş, yapıyor) mutlaqo ishlatilmasin. " +
+  "Faqat o'zbekcha ch, sh, g', o', u, i harflari va o'zbekcha so'zlar bo'lishi shart.";
 
 export const whisperTranscriber: Transcriber = {
   async transcribe(audioPath, language) {
